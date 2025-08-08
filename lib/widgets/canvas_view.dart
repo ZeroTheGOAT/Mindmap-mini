@@ -13,8 +13,6 @@ class CanvasView extends StatefulWidget {
   final Function(String) onAddChild;
   final Function(String) onDeleteNode;
   final Function(MindMapNode)? onNodeTap;
-  final NodeShape shape;
-  final Function(String) onChangeShape;
 
   const CanvasView({
     Key? key,
@@ -23,8 +21,6 @@ class CanvasView extends StatefulWidget {
     required this.onAddChild,
     required this.onDeleteNode,
     this.onNodeTap,
-    required this.shape,
-    required this.onChangeShape,
   }) : super(key: key);
 
   @override
@@ -97,8 +93,6 @@ class _CanvasViewState extends State<CanvasView> {
               onAddChild: _onAddChild,
               onDeleteNode: _onDeleteNode,
               onNodeTapped: _onNodeTapped,
-              shape: widget.shape,
-              onChangeShape: widget.onChangeShape,
             )),
             _buildZoomControls(),
             _buildCenterViewButton(),

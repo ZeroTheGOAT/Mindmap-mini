@@ -50,8 +50,8 @@ class ConnectorPainter extends CustomPainter {
     );
 
     // Calculate the connection points (approx edges of the nodes)
-    final parentEdge = _getNodeEdge(parentPos, childPos, AppConstants.nodeMinWidth / 2 * zoomLevel, AppConstants.nodeMinHeight / 2 * zoomLevel);
-    final childEdge = _getNodeEdge(childPos, parentPos, AppConstants.nodeMinWidth / 2 * zoomLevel, AppConstants.nodeMinHeight / 2 * zoomLevel);
+    final parentEdge = _getNodeEdge(parentPos, childPos, (AppConstants.nodeMinWidth * zoomLevel) / 2, (AppConstants.nodeMinHeight * zoomLevel) / 2);
+    final childEdge = _getNodeEdge(childPos, parentPos, (AppConstants.nodeMinWidth * zoomLevel) / 2, (AppConstants.nodeMinHeight * zoomLevel) / 2);
 
     // Build a curved path between the two edges
     final mid = Offset((parentEdge.dx + childEdge.dx) / 2, (parentEdge.dy + childEdge.dy) / 2);

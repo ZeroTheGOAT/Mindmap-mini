@@ -1,8 +1,12 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
 import '../models/mindmap_node.dart';
 import '../utils/constants.dart';
 
-enum NodeShape { rounded, circle }
+enum NodeShape { circle, square, rectangle, triangle, pentagon, hexagon, parallelogram }
+
+NodeShape shapeFromId(int id) => NodeShape.values[id.clamp(0, NodeShape.values.length - 1)];
+int shapeIdFor(NodeShape shape) => NodeShape.values.indexOf(shape);
 
 class NodeWidget extends StatefulWidget {
   final MindMapNode node;
@@ -12,8 +16,6 @@ class NodeWidget extends StatefulWidget {
   final Function(String) onAddChild;
   final Function(String) onDeleteNode;
   final Function(MindMapNode) onNodeTapped;
-  final NodeShape shape;
-  final Function(String) onChangeShape;
 
   const NodeWidget({
     Key? key,
@@ -24,8 +26,6 @@ class NodeWidget extends StatefulWidget {
     required this.onAddChild,
     required this.onDeleteNode,
     required this.onNodeTapped,
-    required this.shape,
-    required this.onChangeShape,
   }) : super(key: key);
 
   @override
@@ -36,7 +36,6 @@ class _NodeWidgetState extends State<NodeWidget> {
   bool _isEditing = false;
   late TextEditingController _titleController;
   late TextEditingController _descriptionController;
-  bool _showActionMenu = false;
 
   @override
   void initState() {
@@ -64,23 +63,21 @@ class _NodeWidgetState extends State<NodeWidget> {
       top: scaledPosition.dy - (AppConstants.nodeMinHeight * widget.zoomLevel) / 2,
       child: GestureDetector(
         onTap: () => widget.onNodeTapped(widget.node),
-        onLongPress: () => _showActionMenuDialog(),
+        onLongPress: _showActionMenuDialog,
         child: Draggable<MindMapNode>(
           data: widget.node,
           feedback: _buildNodeContent(true),
           childWhenDragging: _buildNodeContent(false, opacity: 0.5),
           onDragEnd: (details) {
-            if (details.wasAccepted) {
-              final newPosition = Offset(
-                (details.offset.dx - widget.canvasOffset.dx) / widget.zoomLevel,
-                (details.offset.dy - widget.canvasOffset.dy) / widget.zoomLevel,
-              );
-              final updatedNode = widget.node.copyWith(
-                x: newPosition.dx,
-                y: newPosition.dy,
-              );
-              widget.onNodeUpdated(updatedNode);
-            }
+            final newPosition = Offset(
+              (details.offset.dx - widget.canvasOffset.dx) / widget.zoomLevel,
+              (details.offset.dy - widget.canvasOffset.dy) / widget.zoomLevel,
+            );
+            final updatedNode = widget.node.copyWith(
+              x: newPosition.dx,
+              y: newPosition.dy,
+            );
+            widget.onNodeUpdated(updatedNode);
           },
           child: _buildNodeContent(false),
         ),
@@ -89,60 +86,45 @@ class _NodeWidgetState extends State<NodeWidget> {
   }
 
   Widget _buildNodeContent(bool isDragging, {double opacity = 1.0}) {
-    final base = AnimatedContainer(
-      duration: AppConstants.quickAnimationDuration,
-      width: AppConstants.nodeMinWidth * widget.zoomLevel,
-      constraints: BoxConstraints(
-        minHeight: AppConstants.nodeMinHeight * widget.zoomLevel,
-        maxWidth: AppConstants.nodeMaxWidth * widget.zoomLevel,
-      ),
-      decoration: BoxDecoration(
-        color: widget.node.color.withOpacity(opacity),
-        shape: widget.shape == NodeShape.circle ? BoxShape.circle : BoxShape.rectangle,
-        borderRadius: widget.shape == NodeShape.circle
-            ? null
-            : BorderRadius.circular(AppConstants.nodeBorderRadius * widget.zoomLevel),
-        boxShadow: isDragging
-            ? [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.3),
-                  blurRadius: 8 * widget.zoomLevel,
-                  offset: Offset(0, 4 * widget.zoomLevel),
-                ),
-              ]
-            : [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
-                  blurRadius: 4 * widget.zoomLevel,
-                  offset: Offset(0, 2 * widget.zoomLevel),
-                ),
-              ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: widget.shape == NodeShape.circle
-              ? null
-              : BorderRadius.circular(AppConstants.nodeBorderRadius * widget.zoomLevel),
-          onTap: _isEditing ? null : () => widget.onNodeTapped(widget.node),
-          child: Padding(
-            padding: EdgeInsets.all(AppConstants.nodePadding * widget.zoomLevel),
-            child: _isEditing ? _buildEditMode() : _buildDisplayMode(),
-          ),
-        ),
-      ),
+    final shape = shapeFromId(widget.node.shapeId);
+    final diameter = AppConstants.nodeMinWidth * widget.zoomLevel;
+    final width = AppConstants.nodeMinWidth * widget.zoomLevel;
+    final height = AppConstants.nodeMinHeight * widget.zoomLevel;
+
+    Widget content = Padding(
+      padding: EdgeInsets.all(AppConstants.nodePadding * widget.zoomLevel),
+      child: _isEditing ? _buildEditMode() : _buildDisplayMode(),
     );
 
-    if (widget.shape == NodeShape.circle) {
-      final diameter = AppConstants.nodeMinWidth * widget.zoomLevel;
-      return SizedBox(
-        width: diameter,
-        height: diameter,
-        child: base,
-      );
+    switch (shape) {
+      case NodeShape.circle:
+        return SizedBox(
+          width: diameter,
+          height: diameter,
+          child: CustomPaint(
+            painter: _ShapePainter(shape: shape, fill: widget.node.color.withOpacity(opacity), border: widget.node.borderColor),
+            child: Material(color: Colors.transparent, child: content),
+          ),
+        );
+      case NodeShape.square:
+        return SizedBox(
+          width: width,
+          height: width,
+          child: CustomPaint(
+            painter: _ShapePainter(shape: shape, fill: widget.node.color.withOpacity(opacity), border: widget.node.borderColor),
+            child: Material(color: Colors.transparent, child: content),
+          ),
+        );
+      default:
+        return SizedBox(
+          width: width,
+          height: height,
+          child: CustomPaint(
+            painter: _ShapePainter(shape: shape, fill: widget.node.color.withOpacity(opacity), border: widget.node.borderColor),
+            child: Material(color: Colors.transparent, child: content),
+          ),
+        );
     }
-
-    return base;
   }
 
   Widget _buildDisplayMode() {
@@ -167,7 +149,7 @@ class _NodeWidgetState extends State<NodeWidget> {
               widget.node.description!,
               style: AppConstants.captionStyle.copyWith(
                 fontSize: AppConstants.captionStyle.fontSize! * widget.zoomLevel,
-                color: Colors.white.withOpacity(0.8),
+                color: Colors.white.withOpacity(0.9),
               ),
               maxLines: 3,
               overflow: TextOverflow.ellipsis,
@@ -200,11 +182,11 @@ class _NodeWidgetState extends State<NodeWidget> {
           controller: _descriptionController,
           style: AppConstants.captionStyle.copyWith(
             fontSize: AppConstants.captionStyle.fontSize! * widget.zoomLevel,
-            color: Colors.white.withOpacity(0.8),
+            color: Colors.white.withOpacity(0.9),
           ),
           decoration: InputDecoration(
             hintText: 'Description (optional)',
-            hintStyle: TextStyle(color: Colors.white.withOpacity(0.5)),
+            hintStyle: TextStyle(color: Colors.white.withOpacity(0.6)),
             border: InputBorder.none,
             contentPadding: EdgeInsets.zero,
           ),
@@ -216,20 +198,12 @@ class _NodeWidgetState extends State<NodeWidget> {
           children: [
             GestureDetector(
               onTap: _saveChanges,
-              child: Icon(
-                Icons.check,
-                color: Colors.white,
-                size: 16 * widget.zoomLevel,
-              ),
+              child: Icon(Icons.check, color: Colors.white, size: 16 * widget.zoomLevel),
             ),
             SizedBox(width: 8 * widget.zoomLevel),
             GestureDetector(
               onTap: _cancelEdit,
-              child: Icon(
-                Icons.close,
-                color: Colors.white,
-                size: 16 * widget.zoomLevel,
-              ),
+              child: Icon(Icons.close, color: Colors.white, size: 16 * widget.zoomLevel),
             ),
           ],
         ),
@@ -254,11 +228,11 @@ class _NodeWidgetState extends State<NodeWidget> {
               },
             ),
             ListTile(
-              leading: Icon(Icons.add),
-              title: Text('Add Child'),
+              leading: Icon(Icons.color_lens),
+              title: Text('Change Color'),
               onTap: () {
                 Navigator.pop(context);
-                widget.onAddChild(widget.node.id);
+                _showColorPicker();
               },
             ),
             ListTile(
@@ -266,7 +240,15 @@ class _NodeWidgetState extends State<NodeWidget> {
               title: Text('Change Shape'),
               onTap: () {
                 Navigator.pop(context);
-                widget.onChangeShape(widget.node.id);
+                _cycleShape();
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.add),
+              title: Text('Add Child'),
+              onTap: () {
+                Navigator.pop(context);
+                widget.onAddChild(widget.node.id);
               },
             ),
             ListTile(
@@ -281,6 +263,86 @@ class _NodeWidgetState extends State<NodeWidget> {
         ),
       ),
     );
+  }
+
+  void _showColorPicker() async {
+    final colors = <Color>[
+      const Color(0xFF2196F3),
+      const Color(0xFF4CAF50),
+      const Color(0xFFFF9800),
+      const Color(0xFFE91E63),
+      const Color(0xFF9C27B0),
+      const Color(0xFF00BCD4),
+      const Color(0xFFFF5722),
+      const Color(0xFF795548),
+      const Color(0xFF37474F),
+      const Color(0xFF607D8B),
+    ];
+
+    Color selectedFill = widget.node.color;
+    Color selectedBorder = widget.node.borderColor;
+
+    await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Pick Colors'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Align(alignment: Alignment.centerLeft, child: Text('Fill Color')),
+            SizedBox(height: 8),
+            _buildColorGrid(colors, selectedFill, (c) => setState(() => selectedFill = c)),
+            SizedBox(height: 16),
+            Align(alignment: Alignment.centerLeft, child: Text('Border Color')),
+            SizedBox(height: 8),
+            _buildColorGrid(colors, selectedBorder, (c) => setState(() => selectedBorder = c)),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: Text('Cancel')),
+          ElevatedButton(
+            onPressed: () {
+              final updated = widget.node.copyWith(color: selectedFill, borderColor: selectedBorder);
+              widget.onNodeUpdated(updated);
+              Navigator.pop(context);
+            },
+            child: Text('Apply'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildColorGrid(List<Color> colors, Color selected, ValueChanged<Color> onPick) {
+    return SizedBox(
+      height: 100,
+      child: GridView.count(
+        crossAxisCount: 5,
+        mainAxisSpacing: 8,
+        crossAxisSpacing: 8,
+        shrinkWrap: true,
+        children: [
+          for (final c in colors)
+            GestureDetector(
+              onTap: () => onPick(c),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: c,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: selected == c ? Colors.black : Colors.white, width: 2),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  void _cycleShape() {
+    final current = shapeFromId(widget.node.shapeId);
+    final nextIndex = (shapeIdFor(current) + 1) % NodeShape.values.length;
+    final updated = widget.node.copyWith(shapeId: nextIndex);
+    widget.onNodeUpdated(updated);
   }
 
   void _confirmDelete() {
@@ -321,5 +383,79 @@ class _NodeWidgetState extends State<NodeWidget> {
     _titleController.text = widget.node.title;
     _descriptionController.text = widget.node.description ?? '';
     setState(() => _isEditing = false);
+  }
+}
+
+class _ShapePainter extends CustomPainter {
+  final NodeShape shape;
+  final Color fill;
+  final Color border;
+
+  _ShapePainter({required this.shape, required this.fill, required this.border});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paintFill = Paint()..color = fill..style = PaintingStyle.fill;
+    final paintStroke = Paint()
+      ..color = border
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.0;
+
+    Path path;
+    switch (shape) {
+      case NodeShape.circle:
+        canvas.drawCircle(size.center(Offset.zero), size.shortestSide / 2, paintFill);
+        canvas.drawCircle(size.center(Offset.zero), size.shortestSide / 2, paintStroke);
+        return;
+      case NodeShape.square:
+        path = Path()..addRect(Rect.fromLTWH(0, 0, size.shortestSide, size.shortestSide));
+        break;
+      case NodeShape.rectangle:
+        path = Path()..addRRect(RRect.fromRectAndRadius(Offset.zero & size, const Radius.circular(12)));
+        break;
+      case NodeShape.triangle:
+        path = Path()
+          ..moveTo(size.width / 2, 0)
+          ..lineTo(size.width, size.height)
+          ..lineTo(0, size.height)
+          ..close();
+        break;
+      case NodeShape.pentagon:
+        path = _regularPolygonPath(size, 5);
+        break;
+      case NodeShape.hexagon:
+        path = _regularPolygonPath(size, 6);
+        break;
+      case NodeShape.parallelogram:
+        final skew = size.width * 0.2;
+        path = Path()
+          ..moveTo(skew, 0)
+          ..lineTo(size.width, 0)
+          ..lineTo(size.width - skew, size.height)
+          ..lineTo(0, size.height)
+          ..close();
+        break;
+    }
+    canvas.drawPath(path, paintFill);
+    canvas.drawPath(path, paintStroke);
+  }
+
+  Path _regularPolygonPath(Size size, int sides) {
+    final path = Path();
+    final center = size.center(Offset.zero);
+    final radius = 0.5 * size.shortestSide;
+    for (int i = 0; i < sides; i++) {
+      final angle = (pi / 2) + (2 * pi * i / sides);
+      final x = center.dx + radius * cos(angle);
+      final y = center.dy - radius * sin(angle);
+      if (i == 0) path.moveTo(x, y); else path.lineTo(x, y);
+    }
+    path.close();
+    return path;
+  }
+
+  @override
+  bool shouldRepaint(covariant _ShapePainter oldDelegate) {
+    return oldDelegate.shape != shape || oldDelegate.fill != fill || oldDelegate.border != border;
   }
 } 

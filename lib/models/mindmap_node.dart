@@ -32,6 +32,14 @@ class MindMapNode extends HiveObject {
   @HiveField(8)
   DateTime updatedAt;
 
+  // New: per-node border color
+  @HiveField(9)
+  Color borderColor;
+
+  // New: per-node shape id (see NodeShape enum mapping)
+  @HiveField(10)
+  int shapeId;
+
   MindMapNode({
     required this.id,
     required this.title,
@@ -42,8 +50,12 @@ class MindMapNode extends HiveObject {
     this.color = const Color(0xFF2196F3),
     DateTime? createdAt,
     DateTime? updatedAt,
+    Color? borderColor,
+    int? shapeId,
   })  : createdAt = createdAt ?? DateTime.now(),
-        updatedAt = updatedAt ?? DateTime.now();
+        updatedAt = updatedAt ?? DateTime.now(),
+        borderColor = borderColor ?? const Color(0xFF0D47A1),
+        shapeId = shapeId ?? 0; // default to first shape
 
   Offset get position => Offset(x, y);
 
@@ -62,6 +74,8 @@ class MindMapNode extends HiveObject {
       'x': x,
       'y': y,
       'color': color.value,
+      'borderColor': borderColor.value,
+      'shapeId': shapeId,
       'createdAt': createdAt.millisecondsSinceEpoch,
       'updatedAt': updatedAt.millisecondsSinceEpoch,
     };
@@ -76,6 +90,8 @@ class MindMapNode extends HiveObject {
       x: map['x'].toDouble(),
       y: map['y'].toDouble(),
       color: Color(map['color']),
+      borderColor: map['borderColor'] != null ? Color(map['borderColor']) : null,
+      shapeId: map['shapeId'] ?? 0,
       createdAt: DateTime.fromMillisecondsSinceEpoch(map['createdAt']),
       updatedAt: DateTime.fromMillisecondsSinceEpoch(map['updatedAt']),
     );
@@ -91,6 +107,8 @@ class MindMapNode extends HiveObject {
     Color? color,
     DateTime? createdAt,
     DateTime? updatedAt,
+    Color? borderColor,
+    int? shapeId,
   }) {
     return MindMapNode(
       id: id ?? this.id,
@@ -102,6 +120,8 @@ class MindMapNode extends HiveObject {
       color: color ?? this.color,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      borderColor: borderColor ?? this.borderColor,
+      shapeId: shapeId ?? this.shapeId,
     );
   }
 

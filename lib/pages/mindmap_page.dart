@@ -7,7 +7,6 @@ import '../models/mindmap_node.dart';
 import '../services/map_manager.dart';
 import '../utils/constants.dart';
 import '../widgets/canvas_view.dart';
-import '../widgets/node_widget.dart';
 
 class MindMapPage extends StatefulWidget {
   final MindMap mindMap;
@@ -26,8 +25,6 @@ class _MindMapPageState extends State<MindMapPage> {
   final Uuid _uuid = const Uuid();
   bool _isSaving = false;
 
-  // UI state
-  NodeShape _currentShape = NodeShape.rounded;
   String? _pendingConnectSourceId;
 
   @override
@@ -75,15 +72,6 @@ class _MindMapPageState extends State<MindMapPage> {
                 ),
               ),
               PopupMenuItem(
-                value: 'toggle_shape',
-                child: ListTile(
-                  leading: Icon(Icons.change_circle),
-                  title: Text('Toggle Node Shape'),
-                  contentPadding: EdgeInsets.zero,
-                  minLeadingWidth: 0,
-                ),
-              ),
-              PopupMenuItem(
                 value: 'connect_mode',
                 child: ListTile(
                   leading: Icon(Icons.alt_route),
@@ -114,8 +102,6 @@ class _MindMapPageState extends State<MindMapPage> {
             onAddChild: _addChildNode,
             onDeleteNode: _deleteNode,
             onNodeTap: _onNodeTap,
-            shape: _currentShape,
-            onChangeShape: _onChangeNodeShape,
           ),
           if (_isSaving)
             Positioned(
@@ -155,7 +141,7 @@ class _MindMapPageState extends State<MindMapPage> {
               left: 16,
               bottom: 16,
               child: Chip(
-                label: Text('Select target node to connect...'),
+                label: Text(_pendingConnectSourceId!.isEmpty ? 'Tap source node...' : 'Select target node to connect...'),
                 avatar: Icon(Icons.alt_route),
                 backgroundColor: Colors.amber.shade100,
               ),
@@ -176,12 +162,13 @@ class _MindMapPageState extends State<MindMapPage> {
       _currentMindMap = updatedMindMap;
     });
     context.read<MapManager>().updateCurrentMindMap(_currentMindMap);
+    // Auto-save in background
+    Future.microtask(() => context.read<MapManager>().saveCurrentMindMap());
   }
 
   void _onNodeTap(MindMapNode node) {
     if (_pendingConnectSourceId == null) return;
     if (_pendingConnectSourceId!.isEmpty) {
-      // Set source
       setState(() => _pendingConnectSourceId = node.id);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Now tap the target node to connect to')),
@@ -346,20 +333,13 @@ class _MindMapPageState extends State<MindMapPage> {
         _addRootNode();
         break;
       case 'center_view':
-        // Center view handled by CanvasView button; trigger here by calling setState to rebuild and then calling center
-        // Not directly accessible; user can press the floating button.
-        break;
-      case 'toggle_shape':
-        setState(() {
-          _currentShape = _currentShape == NodeShape.rounded ? NodeShape.circle : NodeShape.rounded;
-        });
+        // Center view via the button on canvas
         break;
       case 'connect_mode':
         setState(() {
           _pendingConnectSourceId = _pendingConnectSourceId == null ? '' : null;
         });
         if (_pendingConnectSourceId == null) return;
-        // Wait for the next node tap to set source id
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Tap a source node to start connecting')),
         );
@@ -413,12 +393,6 @@ class _MindMapPageState extends State<MindMapPage> {
         setState(() => _isSaving = false);
       }
     }
-  }
-
-  void _onChangeNodeShape(String nodeId) {
-    setState(() {
-      _currentShape = _currentShape == NodeShape.rounded ? NodeShape.circle : NodeShape.rounded;
-    });
   }
 
   @override

@@ -26,13 +26,15 @@ class MindMapNodeAdapter extends TypeAdapter<MindMapNode> {
       color: fields[6] as Color,
       createdAt: fields[7] as DateTime?,
       updatedAt: fields[8] as DateTime?,
+      borderColor: fields[9] as Color?,
+      shapeId: fields[10] as int?,
     );
   }
 
   @override
   void write(BinaryWriter writer, MindMapNode obj) {
     writer
-      ..writeByte(9)
+      ..writeByte(11)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -50,7 +52,11 @@ class MindMapNodeAdapter extends TypeAdapter<MindMapNode> {
       ..writeByte(7)
       ..write(obj.createdAt)
       ..writeByte(8)
-      ..write(obj.updatedAt);
+      ..write(obj.updatedAt)
+      ..writeByte(9)
+      ..write(obj.borderColor)
+      ..writeByte(10)
+      ..write(obj.shapeId);
   }
 
   @override
