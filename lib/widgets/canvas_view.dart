@@ -5,6 +5,7 @@ import '../models/mindmap_node.dart';
 import '../utils/constants.dart';
 import 'node_widget.dart';
 import 'connector_painter.dart';
+import '../services/local_storage_service.dart';
 
 class CanvasView extends StatefulWidget {
   final MindMap mindMap;
@@ -41,12 +42,24 @@ class _CanvasViewState extends State<CanvasView> {
   }
 
   Future<void> _loadSettings() async {
-    // Load settings from local storage
-    // This would be implemented with the LocalStorageService
     setState(() {
-      _showGrid = false;
-      _snapToGrid = false;
-      _gridSize = 20.0;
+      _showGrid = LocalStorageService.getShowGrid();
+      _snapToGrid = LocalStorageService.getSnapToGrid();
+      _gridSize = LocalStorageService.getGridSize();
+    });
+    // Listen to settings changes
+    LocalStorageService.settingsListenable(keys: [
+      AppConstants.showGridKey,
+      AppConstants.snapToGridKey,
+      AppConstants.gridSizeKey,
+    ]).addListener(() {
+      if (mounted) {
+        setState(() {
+          _showGrid = LocalStorageService.getShowGrid();
+          _snapToGrid = LocalStorageService.getSnapToGrid();
+          _gridSize = LocalStorageService.getGridSize();
+        });
+      }
     });
   }
 
@@ -177,12 +190,25 @@ class _CanvasViewState extends State<CanvasView> {
   }
 
   void _onNodeUpdated(MindMapNode updatedNode) {
+    // Optionally snap updated position to grid
+    final snappedNode = _snapToGrid
+        ? updatedNode.copyWith(
+            x: _snapValue(updatedNode.x),
+            y: _snapValue(updatedNode.y),
+          )
+        : updatedNode;
+
     final updatedMap = widget.mindMap.copyWith(
       nodes: widget.mindMap.nodes.map((node) {
-        return node.id == updatedNode.id ? updatedNode : node;
+        return node.id == snappedNode.id ? snappedNode : node;
       }).toList(),
     );
     widget.onMindMapUpdated(updatedMap);
+  }
+
+  double _snapValue(double v) {
+    final step = _gridSize;
+    return (v / step).round() * step;
   }
 
   void _onAddChild(String parentId) {

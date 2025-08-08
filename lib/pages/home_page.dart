@@ -21,9 +21,7 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<MapManager>().initialize();
-    });
+    // MapManager is initialized in main.dart
   }
 
   @override
@@ -40,6 +38,12 @@ class _HomePageState extends State<HomePage> {
         backgroundColor: AppConstants.primaryColor,
         foregroundColor: Colors.white,
         elevation: 0,
+        leading: Builder(
+          builder: (context) => IconButton(
+            icon: Icon(Icons.menu),
+            onPressed: () => Scaffold.of(context).openDrawer(),
+          ),
+        ),
         actions: [
           IconButton(
             icon: Icon(Icons.settings),
@@ -52,6 +56,7 @@ class _HomePageState extends State<HomePage> {
           ),
         ],
       ),
+      drawer: _buildDrawer(),
       body: Consumer<MapManager>(
         builder: (context, mapManager, child) {
           if (mapManager.isLoading) {
@@ -85,7 +90,7 @@ class _HomePageState extends State<HomePage> {
                   ),
                   SizedBox(height: AppConstants.spacingMedium),
                   ElevatedButton(
-                    onPressed: () => mapManager.initialize(),
+                    onPressed: () => context.read<MapManager>().initialize(),
                     child: Text('Retry'),
                   ),
                 ],
@@ -106,6 +111,46 @@ class _HomePageState extends State<HomePage> {
         label: Text('New Mind Map'),
         backgroundColor: AppConstants.primaryColor,
         foregroundColor: Colors.white,
+      ),
+    );
+  }
+
+  Widget _buildDrawer() {
+    return Drawer(
+      child: SafeArea(
+        child: Consumer<MapManager>(
+          builder: (context, mapManager, _) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: EdgeInsets.all(AppConstants.spacingMedium),
+                  child: Text(
+                    'Saved Mind Maps',
+                    style: AppConstants.titleStyle,
+                  ),
+                ),
+                Expanded(
+                  child: ListView.builder(
+                    itemCount: mapManager.mindMaps.length,
+                    itemBuilder: (context, index) {
+                      final map = mapManager.mindMaps[index];
+                      return ListTile(
+                        leading: Icon(Icons.account_tree),
+                        title: Text(map.title, maxLines: 1, overflow: TextOverflow.ellipsis),
+                        subtitle: Text('Nodes: ${map.nodes.length}'),
+                        onTap: () {
+                          Navigator.pop(context);
+                          _openMindMap(map);
+                        },
+                      );
+                    },
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
       ),
     );
   }
@@ -405,15 +450,16 @@ class _HomePageState extends State<HomePage> {
             onPressed: () => Navigator.pop(context),
             child: Text('Cancel'),
           ),
-          TextButton(
-            onPressed: () {
-              mapManager.deleteMindMap(mindMap.id);
-              Navigator.pop(context);
+          ElevatedButton(
+            onPressed: () async {
+              await mapManager.deleteMindMap(mindMap.id);
+              if (mounted) Navigator.pop(context);
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(content: Text('Mind map deleted')),
               );
             },
-            child: Text('Delete', style: TextStyle(color: Colors.red)),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: Text('Delete'),
           ),
         ],
       ),

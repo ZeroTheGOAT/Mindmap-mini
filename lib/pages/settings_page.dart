@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../utils/constants.dart';
+import '../services/local_storage_service.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({Key? key}) : super(key: key);
@@ -21,12 +22,11 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   Future<void> _loadSettings() async {
-    // Load settings from local storage
     setState(() {
-      _showGrid = false;
-      _snapToGrid = false;
-      _gridSize = 20.0;
-      _themeMode = ThemeMode.system;
+      _showGrid = LocalStorageService.getShowGrid();
+      _snapToGrid = LocalStorageService.getSnapToGrid();
+      _gridSize = LocalStorageService.getGridSize();
+      _themeMode = LocalStorageService.getThemeMode();
     });
   }
 
@@ -139,13 +139,12 @@ class _SettingsPageState extends State<SettingsPage> {
               ),
             ),
           ],
-          onChanged: (ThemeMode? newValue) {
+          onChanged: (ThemeMode? newValue) async {
             if (newValue != null) {
               setState(() {
                 _themeMode = newValue;
               });
-              // Update theme in the app
-              // This would be handled by a theme provider
+              await LocalStorageService.setThemeMode(newValue);
             }
           },
         ),
@@ -166,22 +165,22 @@ class _SettingsPageState extends State<SettingsPage> {
           title: Text('Show Grid'),
           subtitle: Text('Display a grid background on the canvas'),
           value: _showGrid,
-          onChanged: (bool value) {
+          onChanged: (bool value) async {
             setState(() {
               _showGrid = value;
             });
-            // Save setting
+            await LocalStorageService.setShowGrid(value);
           },
         ),
         SwitchListTile(
           title: Text('Snap to Grid'),
           subtitle: Text('Snap nodes to grid lines when dragging'),
           value: _snapToGrid,
-          onChanged: (bool value) {
+          onChanged: (bool value) async {
             setState(() {
               _snapToGrid = value;
             });
-            // Save setting
+            await LocalStorageService.setSnapToGrid(value);
           },
         ),
         if (_showGrid || _snapToGrid) ...[
@@ -196,11 +195,11 @@ class _SettingsPageState extends State<SettingsPage> {
             max: 50.0,
             divisions: 8,
             label: '${_gridSize.round()}px',
-            onChanged: (double value) {
+            onChanged: (double value) async {
               setState(() {
                 _gridSize = value;
               });
-              // Save setting
+              await LocalStorageService.setGridSize(value);
             },
           ),
         ],

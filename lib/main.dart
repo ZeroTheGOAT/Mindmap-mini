@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'services/map_manager.dart';
 import 'utils/constants.dart';
 import 'pages/home_page.dart';
+import 'services/local_storage_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -26,13 +27,33 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return ChangeNotifierProvider.value(
       value: mapManager,
-      child: MaterialApp(
-        title: 'MindMap Mini',
-        debugShowCheckedModeBanner: false,
-        theme: _buildLightTheme(),
-        darkTheme: _buildDarkTheme(),
-        themeMode: ThemeMode.system,
-        home: HomePage(),
+      child: Builder(
+        builder: (_) {
+          if (!LocalStorageService.hasSettingsBox) {
+            return MaterialApp(
+              title: 'MindMap Mini',
+              debugShowCheckedModeBanner: false,
+              theme: _buildLightTheme(),
+              darkTheme: _buildDarkTheme(),
+              themeMode: ThemeMode.system,
+              home: HomePage(),
+            );
+          }
+          return ValueListenableBuilder(
+            valueListenable: LocalStorageService.settingsListenable(keys: [AppConstants.themeKey]),
+            builder: (context, box, _) {
+              final themeMode = LocalStorageService.getThemeMode();
+              return MaterialApp(
+                title: 'MindMap Mini',
+                debugShowCheckedModeBanner: false,
+                theme: _buildLightTheme(),
+                darkTheme: _buildDarkTheme(),
+                themeMode: themeMode,
+                home: HomePage(),
+              );
+            },
+          );
+        },
       ),
     );
   }

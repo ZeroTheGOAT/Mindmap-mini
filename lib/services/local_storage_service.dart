@@ -3,6 +3,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import '../models/mindmap.dart';
 import '../models/mindmap_node.dart';
 import '../utils/constants.dart';
+import '../models/color_adapter.dart';
 
 class LocalStorageService {
   static const String _mindMapsBoxName = AppConstants.mindMapsBoxName;
@@ -14,14 +15,23 @@ class LocalStorageService {
   static Future<void> initialize() async {
     await Hive.initFlutter();
     
-    // Register adapters
-    Hive.registerAdapter(MindMapNodeAdapter());
-    Hive.registerAdapter(MindMapAdapter());
+    // Register adapters (guarded to avoid duplicates)
+    if (!Hive.isAdapterRegistered(2)) {
+      Hive.registerAdapter(ColorAdapter());
+    }
+    if (!Hive.isAdapterRegistered(0)) {
+      Hive.registerAdapter(MindMapNodeAdapter());
+    }
+    if (!Hive.isAdapterRegistered(1)) {
+      Hive.registerAdapter(MindMapAdapter());
+    }
     
     // Open boxes
     _mindMapsBox = await Hive.openBox<MindMap>(_mindMapsBoxName);
     _settingsBox = await Hive.openBox(_settingsBoxName);
   }
+  
+  static bool get hasSettingsBox => _settingsBox != null;
   
   // Mind Maps operations
   static Future<void> saveMindMap(MindMap mindMap) async {
@@ -93,6 +103,11 @@ class LocalStorageService {
   
   static Future<void> setThemeMode(ThemeMode mode) async {
     await saveSetting(AppConstants.themeKey, mode.index);
+  }
+  
+  // Expose settings listenable (e.g., for theme changes)
+  static ValueListenable<Box> settingsListenable({List<dynamic>? keys}) {
+    return _settingsBox!.listenable(keys: keys);
   }
   
   // Close boxes
