@@ -7,6 +7,7 @@ import '../models/mindmap_node.dart';
 import '../services/map_manager.dart';
 import '../utils/constants.dart';
 import '../widgets/canvas_view.dart';
+import '../widgets/node_widget.dart';
 
 class MindMapPage extends StatefulWidget {
   final MindMap mindMap;
@@ -25,12 +26,15 @@ class _MindMapPageState extends State<MindMapPage> {
   final Uuid _uuid = const Uuid();
   bool _isSaving = false;
 
+  // UI state
+  NodeShape _currentShape = NodeShape.rounded;
+  String? _pendingConnectSourceId;
+
   @override
   void initState() {
     super.initState();
     _currentMindMap = widget.mindMap;
     
-    // Set this as the current mind map in the manager
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<MapManager>().updateCurrentMindMap(_currentMindMap);
     });
@@ -71,6 +75,24 @@ class _MindMapPageState extends State<MindMapPage> {
                 ),
               ),
               PopupMenuItem(
+                value: 'toggle_shape',
+                child: ListTile(
+                  leading: Icon(Icons.change_circle),
+                  title: Text('Toggle Node Shape'),
+                  contentPadding: EdgeInsets.zero,
+                  minLeadingWidth: 0,
+                ),
+              ),
+              PopupMenuItem(
+                value: 'connect_mode',
+                child: ListTile(
+                  leading: Icon(Icons.alt_route),
+                  title: Text(_pendingConnectSourceId == null ? 'Start Connect' : 'Cancel Connect'),
+                  contentPadding: EdgeInsets.zero,
+                  minLeadingWidth: 0,
+                ),
+              ),
+              PopupMenuItem(
                 value: 'export',
                 child: ListTile(
                   leading: Icon(Icons.download),
@@ -91,6 +113,9 @@ class _MindMapPageState extends State<MindMapPage> {
             onMindMapUpdated: _onMindMapUpdated,
             onAddChild: _addChildNode,
             onDeleteNode: _deleteNode,
+            onNodeTap: _onNodeTap,
+            shape: _currentShape,
+            onChangeShape: _onChangeNodeShape,
           ),
           if (_isSaving)
             Positioned(
@@ -125,6 +150,16 @@ class _MindMapPageState extends State<MindMapPage> {
                 ),
               ),
             ),
+          if (_pendingConnectSourceId != null)
+            Positioned(
+              left: 16,
+              bottom: 16,
+              child: Chip(
+                label: Text('Select target node to connect...'),
+                avatar: Icon(Icons.alt_route),
+                backgroundColor: Colors.amber.shade100,
+              ),
+            ),
         ],
       ),
       floatingActionButton: FloatingActionButton(
@@ -140,9 +175,31 @@ class _MindMapPageState extends State<MindMapPage> {
     setState(() {
       _currentMindMap = updatedMindMap;
     });
-    
-    // Update the current mind map in the manager
     context.read<MapManager>().updateCurrentMindMap(_currentMindMap);
+  }
+
+  void _onNodeTap(MindMapNode node) {
+    if (_pendingConnectSourceId == null) return;
+    if (_pendingConnectSourceId!.isEmpty) {
+      // Set source
+      setState(() => _pendingConnectSourceId = node.id);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Now tap the target node to connect to')),
+      );
+      return;
+    }
+
+    if (node.id == _pendingConnectSourceId) return;
+
+    final updatedNodes = _currentMindMap.nodes.map((n) {
+      if (n.id == node.id) {
+        return n.copyWith(parentId: _pendingConnectSourceId);
+      }
+      return n;
+    }).toList();
+
+    _onMindMapUpdated(_currentMindMap.copyWith(nodes: updatedNodes));
+    setState(() => _pendingConnectSourceId = null);
   }
 
   void _addRootNode() {
@@ -222,13 +279,10 @@ class _MindMapPageState extends State<MindMapPage> {
     String? description,
     String? parentId,
   }) {
-    // Calculate position for the new node
     Offset position;
     if (parentId == null) {
-      // Root node - place in center
       position = Offset.zero;
     } else {
-      // Child node - place near parent
       final parentNode = _currentMindMap.getNode(parentId);
       if (parentNode == null) return;
 
@@ -264,7 +318,6 @@ class _MindMapPageState extends State<MindMapPage> {
       nodes: _currentMindMap.nodes.where((node) => node.id != nodeId).toList(),
     );
 
-    // Also remove all child nodes recursively
     final nodesToRemove = <String>{nodeId};
     final nodesToCheck = <String>{nodeId};
 
@@ -293,7 +346,23 @@ class _MindMapPageState extends State<MindMapPage> {
         _addRootNode();
         break;
       case 'center_view':
-        // This would be handled by the CanvasView
+        // Center view handled by CanvasView button; trigger here by calling setState to rebuild and then calling center
+        // Not directly accessible; user can press the floating button.
+        break;
+      case 'toggle_shape':
+        setState(() {
+          _currentShape = _currentShape == NodeShape.rounded ? NodeShape.circle : NodeShape.rounded;
+        });
+        break;
+      case 'connect_mode':
+        setState(() {
+          _pendingConnectSourceId = _pendingConnectSourceId == null ? '' : null;
+        });
+        if (_pendingConnectSourceId == null) return;
+        // Wait for the next node tap to set source id
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Tap a source node to start connecting')),
+        );
         break;
       case 'export':
         _showExportDialog();
@@ -322,7 +391,6 @@ class _MindMapPageState extends State<MindMapPage> {
 
     try {
       await context.read<MapManager>().saveCurrentMindMap();
-      
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -347,9 +415,14 @@ class _MindMapPageState extends State<MindMapPage> {
     }
   }
 
+  void _onChangeNodeShape(String nodeId) {
+    setState(() {
+      _currentShape = _currentShape == NodeShape.rounded ? NodeShape.circle : NodeShape.rounded;
+    });
+  }
+
   @override
   void dispose() {
-    // Auto-save when leaving the page
     _saveMindMap();
     super.dispose();
   }

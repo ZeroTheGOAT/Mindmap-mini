@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../models/mindmap_node.dart';
 import '../utils/constants.dart';
 
+enum NodeShape { rounded, circle }
+
 class NodeWidget extends StatefulWidget {
   final MindMapNode node;
   final double zoomLevel;
@@ -10,6 +12,8 @@ class NodeWidget extends StatefulWidget {
   final Function(String) onAddChild;
   final Function(String) onDeleteNode;
   final Function(MindMapNode) onNodeTapped;
+  final NodeShape shape;
+  final Function(String) onChangeShape;
 
   const NodeWidget({
     Key? key,
@@ -20,6 +24,8 @@ class NodeWidget extends StatefulWidget {
     required this.onAddChild,
     required this.onDeleteNode,
     required this.onNodeTapped,
+    required this.shape,
+    required this.onChangeShape,
   }) : super(key: key);
 
   @override
@@ -83,7 +89,7 @@ class _NodeWidgetState extends State<NodeWidget> {
   }
 
   Widget _buildNodeContent(bool isDragging, {double opacity = 1.0}) {
-    return AnimatedContainer(
+    final base = AnimatedContainer(
       duration: AppConstants.quickAnimationDuration,
       width: AppConstants.nodeMinWidth * widget.zoomLevel,
       constraints: BoxConstraints(
@@ -92,7 +98,10 @@ class _NodeWidgetState extends State<NodeWidget> {
       ),
       decoration: BoxDecoration(
         color: widget.node.color.withOpacity(opacity),
-        borderRadius: BorderRadius.circular(AppConstants.nodeBorderRadius * widget.zoomLevel),
+        shape: widget.shape == NodeShape.circle ? BoxShape.circle : BoxShape.rectangle,
+        borderRadius: widget.shape == NodeShape.circle
+            ? null
+            : BorderRadius.circular(AppConstants.nodeBorderRadius * widget.zoomLevel),
         boxShadow: isDragging
             ? [
                 BoxShadow(
@@ -112,7 +121,9 @@ class _NodeWidgetState extends State<NodeWidget> {
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          borderRadius: BorderRadius.circular(AppConstants.nodeBorderRadius * widget.zoomLevel),
+          borderRadius: widget.shape == NodeShape.circle
+              ? null
+              : BorderRadius.circular(AppConstants.nodeBorderRadius * widget.zoomLevel),
           onTap: _isEditing ? null : () => widget.onNodeTapped(widget.node),
           child: Padding(
             padding: EdgeInsets.all(AppConstants.nodePadding * widget.zoomLevel),
@@ -121,6 +132,17 @@ class _NodeWidgetState extends State<NodeWidget> {
         ),
       ),
     );
+
+    if (widget.shape == NodeShape.circle) {
+      final diameter = AppConstants.nodeMinWidth * widget.zoomLevel;
+      return SizedBox(
+        width: diameter,
+        height: diameter,
+        child: base,
+      );
+    }
+
+    return base;
   }
 
   Widget _buildDisplayMode() {
@@ -237,6 +259,14 @@ class _NodeWidgetState extends State<NodeWidget> {
               onTap: () {
                 Navigator.pop(context);
                 widget.onAddChild(widget.node.id);
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.change_circle),
+              title: Text('Change Shape'),
+              onTap: () {
+                Navigator.pop(context);
+                widget.onChangeShape(widget.node.id);
               },
             ),
             ListTile(

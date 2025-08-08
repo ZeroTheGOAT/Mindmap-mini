@@ -243,18 +243,6 @@ class _SettingsPageState extends State<SettingsPage> {
         ),
         SizedBox(height: AppConstants.spacingMedium),
         _buildFeatureList(),
-        SizedBox(height: AppConstants.spacingMedium),
-        Text(
-          'Features:',
-          style: AppConstants.subtitleStyle,
-        ),
-        SizedBox(height: AppConstants.spacingSmall),
-        _buildFeatureItem('Create unlimited nested nodes'),
-        _buildFeatureItem('Drag and drop nodes freely'),
-        _buildFeatureItem('Zoom and pan the canvas'),
-        _buildFeatureItem('Save and load mind maps locally'),
-        _buildFeatureItem('Works completely offline'),
-        _buildFeatureItem('Clean, distraction-free interface'),
       ],
     );
   }

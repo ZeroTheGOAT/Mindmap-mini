@@ -49,15 +49,30 @@ class ConnectorPainter extends CustomPainter {
       child.y * zoomLevel + canvasOffset.dy,
     );
 
-    // Calculate the connection points (edges of the nodes)
-    final parentEdge = _getNodeEdge(parentPos, childPos, AppConstants.nodeMinWidth / 2, AppConstants.nodeMinHeight / 2);
-    final childEdge = _getNodeEdge(childPos, parentPos, AppConstants.nodeMinWidth / 2, AppConstants.nodeMinHeight / 2);
+    // Calculate the connection points (approx edges of the nodes)
+    final parentEdge = _getNodeEdge(parentPos, childPos, AppConstants.nodeMinWidth / 2 * zoomLevel, AppConstants.nodeMinHeight / 2 * zoomLevel);
+    final childEdge = _getNodeEdge(childPos, parentPos, AppConstants.nodeMinWidth / 2 * zoomLevel, AppConstants.nodeMinHeight / 2 * zoomLevel);
 
-    // Draw the line
-    canvas.drawLine(parentEdge, childEdge, paint);
+    // Build a curved path between the two edges
+    final mid = Offset((parentEdge.dx + childEdge.dx) / 2, (parentEdge.dy + childEdge.dy) / 2);
+    final dx = childEdge.dx - parentEdge.dx;
+    final dy = childEdge.dy - parentEdge.dy;
+    final length = max(1.0, sqrt(dx * dx + dy * dy));
+    // Perpendicular unit vector
+    final ux = -dy / length;
+    final uy = dx / length;
+    // Curve amount scales with distance but constrained
+    final curve = min(80.0, length / 4);
+    final control = Offset(mid.dx + ux * curve, mid.dy + uy * curve);
+
+    final path = Path()
+      ..moveTo(parentEdge.dx, parentEdge.dy)
+      ..quadraticBezierTo(control.dx, control.dy, childEdge.dx, childEdge.dy);
+
+    canvas.drawPath(path, paint);
 
     // Draw arrow at the child end
-    _drawArrow(canvas, childEdge, parentEdge, paint);
+    _drawArrow(canvas, childEdge, control, paint);
   }
 
   Offset _getNodeEdge(Offset nodeCenter, Offset targetCenter, double halfWidth, double halfHeight) {
@@ -99,12 +114,12 @@ class ConnectorPainter extends CustomPainter {
     return Offset(edgeX, edgeY);
   }
 
-  void _drawArrow(Canvas canvas, Offset arrowTip, Offset arrowBase, Paint paint) {
+  void _drawArrow(Canvas canvas, Offset arrowTip, Offset arrowBaseOrControl, Paint paint) {
     const arrowLength = 8.0;
     const arrowAngle = 0.5; // radians
     
-    final dx = arrowTip.dx - arrowBase.dx;
-    final dy = arrowTip.dy - arrowBase.dy;
+    final dx = arrowTip.dx - arrowBaseOrControl.dx;
+    final dy = arrowTip.dy - arrowBaseOrControl.dy;
     final angle = atan2(dy, dx);
     
     final arrowPoint1 = Offset(

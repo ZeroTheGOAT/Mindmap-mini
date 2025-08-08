@@ -12,6 +12,9 @@ class CanvasView extends StatefulWidget {
   final Function(MindMap) onMindMapUpdated;
   final Function(String) onAddChild;
   final Function(String) onDeleteNode;
+  final Function(MindMapNode)? onNodeTap;
+  final NodeShape shape;
+  final Function(String) onChangeShape;
 
   const CanvasView({
     Key? key,
@@ -19,6 +22,9 @@ class CanvasView extends StatefulWidget {
     required this.onMindMapUpdated,
     required this.onAddChild,
     required this.onDeleteNode,
+    this.onNodeTap,
+    required this.shape,
+    required this.onChangeShape,
   }) : super(key: key);
 
   @override
@@ -27,6 +33,7 @@ class CanvasView extends StatefulWidget {
 
 class _CanvasViewState extends State<CanvasView> {
   double _zoomLevel = 1.0;
+  double _initialZoom = 1.0;
   Offset _canvasOffset = Offset.zero;
   Offset? _lastPanPosition;
   bool _showGrid = false;
@@ -37,6 +44,7 @@ class _CanvasViewState extends State<CanvasView> {
   void initState() {
     super.initState();
     _zoomLevel = widget.mindMap.zoomLevel;
+    _initialZoom = _zoomLevel;
     _canvasOffset = Offset(widget.mindMap.offsetX, widget.mindMap.offsetY);
     _loadSettings();
   }
@@ -47,7 +55,6 @@ class _CanvasViewState extends State<CanvasView> {
       _snapToGrid = LocalStorageService.getSnapToGrid();
       _gridSize = LocalStorageService.getGridSize();
     });
-    // Listen to settings changes
     LocalStorageService.settingsListenable(keys: [
       AppConstants.showGridKey,
       AppConstants.snapToGridKey,
@@ -73,10 +80,7 @@ class _CanvasViewState extends State<CanvasView> {
         color: Theme.of(context).scaffoldBackgroundColor,
         child: Stack(
           children: [
-            // Grid background
             if (_showGrid) _buildGrid(),
-            
-            // Canvas with connectors
             CustomPaint(
               painter: ConnectorPainter(
                 nodes: widget.mindMap.nodes,
@@ -85,8 +89,6 @@ class _CanvasViewState extends State<CanvasView> {
               ),
               size: Size.infinite,
             ),
-            
-            // Nodes
             ...widget.mindMap.nodes.map((node) => NodeWidget(
               node: node,
               zoomLevel: _zoomLevel,
@@ -95,12 +97,10 @@ class _CanvasViewState extends State<CanvasView> {
               onAddChild: _onAddChild,
               onDeleteNode: _onDeleteNode,
               onNodeTapped: _onNodeTapped,
+              shape: widget.shape,
+              onChangeShape: widget.onChangeShape,
             )),
-            
-            // Zoom controls
             _buildZoomControls(),
-            
-            // Center view button
             _buildCenterViewButton(),
           ],
         ),
@@ -161,36 +161,33 @@ class _CanvasViewState extends State<CanvasView> {
 
   void _onScaleStart(ScaleStartDetails details) {
     _lastPanPosition = details.focalPoint;
+    _initialZoom = _zoomLevel;
   }
 
   void _onScaleUpdate(ScaleUpdateDetails details) {
     if (details.scale != 1.0) {
-      // Zoom
-      final newZoom = (_zoomLevel * details.scale).clamp(
+      final newZoom = (_initialZoom * details.scale).clamp(
         AppConstants.minZoomLevel,
         AppConstants.maxZoomLevel,
       );
       setState(() => _zoomLevel = newZoom);
     } else if (details.focalPointDelta != Offset.zero) {
-      // Pan
       setState(() {
         _canvasOffset += details.focalPointDelta;
       });
     }
-    
     _saveViewState();
   }
 
-  void _onCanvasTap() {
-    // Clear any selected nodes or close menus
-  }
+  void _onCanvasTap() {}
 
   void _onNodeTapped(MindMapNode node) {
-    // Handle node tap - could show details or highlight
+    if (widget.onNodeTap != null) {
+      widget.onNodeTap!(node);
+    }
   }
 
   void _onNodeUpdated(MindMapNode updatedNode) {
-    // Optionally snap updated position to grid
     final snappedNode = _snapToGrid
         ? updatedNode.copyWith(
             x: _snapValue(updatedNode.x),
@@ -215,9 +212,7 @@ class _CanvasViewState extends State<CanvasView> {
     final parentNode = widget.mindMap.getNode(parentId);
     if (parentNode == null) return;
 
-    // Calculate position for new child node
     final childPosition = _calculateChildPosition(parentNode);
-    
     widget.onAddChild(parentId);
   }
 
@@ -226,11 +221,8 @@ class _CanvasViewState extends State<CanvasView> {
   }
 
   Offset _calculateChildPosition(MindMapNode parentNode) {
-    // Calculate a position for the new child node
-    // This is a simple implementation - you might want to make it more sophisticated
     final angle = (widget.mindMap.getChildren(parentNode.id).length * 45) * (3.14159 / 180);
     const distance = 150.0;
-    
     return Offset(
       parentNode.x + distance * cos(angle),
       parentNode.y + distance * sin(angle),
@@ -239,7 +231,7 @@ class _CanvasViewState extends State<CanvasView> {
 
   void _zoomIn() {
     setState(() {
-      _zoomLevel = (_zoomLevel * 1.2).clamp(
+      _zoomLevel = (_zoomLevel * 1.15).clamp(
         AppConstants.minZoomLevel,
         AppConstants.maxZoomLevel,
       );
@@ -249,7 +241,7 @@ class _CanvasViewState extends State<CanvasView> {
 
   void _zoomOut() {
     setState(() {
-      _zoomLevel = (_zoomLevel / 1.2).clamp(
+      _zoomLevel = (_zoomLevel / 1.15).clamp(
         AppConstants.minZoomLevel,
         AppConstants.maxZoomLevel,
       );
@@ -266,24 +258,25 @@ class _CanvasViewState extends State<CanvasView> {
 
   void _centerView() {
     if (widget.mindMap.nodes.isEmpty) return;
-    
-    // Calculate the center of all nodes
+
     double minX = double.infinity;
     double maxX = -double.infinity;
     double minY = double.infinity;
     double maxY = -double.infinity;
-    
+
+    final halfW = AppConstants.nodeMinWidth / 2;
+    final halfH = AppConstants.nodeMinHeight / 2;
+
     for (final node in widget.mindMap.nodes) {
-      minX = min(minX, node.x);
-      maxX = max(maxX, node.x);
-      minY = min(minY, node.y);
-      maxY = max(maxY, node.y);
+      minX = min(minX, node.x - halfW);
+      maxX = max(maxX, node.x + halfW);
+      minY = min(minY, node.y - halfH);
+      maxY = max(maxY, node.y + halfH);
     }
-    
+
     final centerX = (minX + maxX) / 2;
     final centerY = (minY + maxY) / 2;
-    
-    // Center the view
+
     final screenCenter = MediaQuery.of(context).size.center(Offset.zero);
     setState(() {
       _canvasOffset = Offset(
@@ -317,10 +310,8 @@ class _CanvasViewState extends State<CanvasView> {
 
   Offset _snapToGridPosition(Offset position) {
     if (!_snapToGrid) return position;
-    
     final snappedX = (position.dx / _gridSize).round() * _gridSize;
     final snappedY = (position.dy / _gridSize).round() * _gridSize;
-    
     return Offset(snappedX, snappedY);
   }
 }
